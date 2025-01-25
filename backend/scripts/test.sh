@@ -1,0 +1,1 @@
+poetry run python -m unittest discover src/hospital_data/tests

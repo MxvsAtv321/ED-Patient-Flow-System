@@ -169,4 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+<<<<<<< HEAD
 .env 
+=======
+
+shell.nix
+>>>>>>> 8646adafd8ec4eb1ce2e850e5205145b923b4205
