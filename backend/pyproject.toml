@@ -9,7 +9,10 @@ readme = "README.md"
 python = "^3.11"
 flask = "^3.1.0"
 flasgger = "^0.9.7.1"
+requests = "^2.32.3"
 
+[tool.poetry.scripts]
+test = "poetry python -m unittest discover tests"
 
 [build-system]
 requires = ["poetry-core"]
