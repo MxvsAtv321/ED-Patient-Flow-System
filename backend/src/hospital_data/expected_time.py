@@ -1,5 +1,5 @@
 from flask import current_app
-from hospital_data.hospital_getters import get_patient_data, get_hospital_state
+from hospital_data.hospital_api import get_patient_data, get_hospital_state
 
 def compute_expected_time_seconds(patient_id: str) -> str:
     triage_cat = str(get_patient_data(patient_id)['triage_category'])
