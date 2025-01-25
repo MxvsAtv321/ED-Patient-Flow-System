@@ -19,9 +19,7 @@ Transform Emergency Department waiting into a more bearable experience through a
 - Available in multiple languages with voice interface
 
 ### Patient Comfort
-- Noise level indicators for different areas
 - Nearby amenities information
-- Basic needs request system
 - Accessibility assistance options
 - Cultural and religious accommodation info
 
