@@ -74,10 +74,10 @@ cd frontend
 npm install
 ```
 
-3. Install backend dependencies
+3. Install backend dependencies using `poetry`
 ```bash
 cd backend
-pip install -r requirements.txt
+poetry install
 ```
 
 4. Set up environment variables
@@ -92,8 +92,7 @@ cp .env.example .env
 npm run dev
 
 # Backend
-python app.py
-```
+bash scripts/run.sh```
 
 ## 📈 Success Metrics
 - Reduction in status inquiries
