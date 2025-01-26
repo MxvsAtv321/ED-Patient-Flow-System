@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { Loader2, AlertCircle, Clock, ClipboardCheck, TestTube, Stethoscope, ArrowRight, HelpCircle, User } from "lucide-react";
+import { ChatBot } from "@/components/ChatBot";
 
 const IFEM_API_BASE = "https://ifem-award-mchacks-2025.onrender.com/api/v1";
 
@@ -934,6 +935,13 @@ export default function PatientPage() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Add ChatBot with proper z-index */}
+      {patientData && (
+        <div className="relative z-50">
+          <ChatBot patientId={patientData.id} />
+        </div>
+      )}
     </main>
   );
 } 
