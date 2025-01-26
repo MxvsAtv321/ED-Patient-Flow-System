@@ -3,3 +3,4 @@ SPECIFIC_PATIENT_INFO_URL = "https://ifem-award-mchacks-2025.onrender.com/api/v1
 QUEUE_DATA_URL = "https://ifem-award-mchacks-2025.onrender.com/api/v1/queue"
 
 BACKEND_PORT = 5000
+DB_PATH = "db/hospital_data.db"
