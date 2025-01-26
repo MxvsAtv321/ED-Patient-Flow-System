@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_mail import Mail, Message
 from flasgger import Swagger
-from config import BACKEND_PORT
+from config import BACKEND_PORT, MAIL_PASSWORD, MAIL_PORT, MAIL_SERVER, MAIL_USE_SSL, MAIL_USE_TLS
 import logging
 import os
 from dotenv import load_dotenv
@@ -26,40 +26,95 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-app.config["MAIL_SERVER"] = os.getenv('MAIL_SERVER')
-app.config["MAIL_PORT"] = os.getenv('MAIL_PORT')
 app.config["MAIL_USERNAME"] = os.getenv('MAIL_USERNAME')
 app.config["MAIL_PASSWORD"] = os.getenv('MAIL_PASSWORD')
-app.config["MAIL_USE_TLS"] = os.getenv('MAIL_USE_TLS') == 'True'
-app.config["MAIL_USE_SSL"] = os.getenv('MAIL_USE_SSL') == 'True'
+
+app.config["MAIL_SERVER"] = MAIL_SERVER
+app.config["MAIL_PORT"] = MAIL_PORT
+app.config["MAIL_USE_TLS"] = MAIL_USE_TLS
+app.config["MAIL_USE_SSL"] = MAIL_USE_SSL
 mail = Mail(app)
 
 @app.route("/")
 def index():
-    return "Hello world or something"
+    return "Hello world!"
 
 @app.route("/patient/<patient_id>", methods=["GET"])
 def get_wait_times(patient_id: str):
     """
     Retrieve patient data
     ---
-    parameters:
-      - name: patient_id
-        in: path
-        type: string
-        required: true
-        description: The ID of the patient
-    responses:
-      200:
-        description: Patient data object
-        schema:
-          type: object
-          properties:
-            expectedTime:
-              type: integer
-              description: Expected time until next phase in seconds
+openapi: 3.0.0
+info:
+  title: Patient Queue API
+  version: 1.0.0
+description: API to retrieve patient wait time and queue data.
+paths:
+  /patient/{patient_id}:
+    get:
+      summary: Retrieve patient wait time and queue position
+      description: Get details about a patient's wait time, queue position, and arrival data.
+      parameters:
+        - name: patient_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the patient
+      responses:
+        200:
+          description: Successful response with patient data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  arrivalTime:
+                    type: string
+                    format: date-time
+                    description: The arrival time of the patient
+                  elapsedTime:
+                    type: integer
+                    description: Time already spent in queue (seconds)
+                  triage:
+                    type: string
+                    description: Triage category of the patient
+                  expectedTime:
+                    type: integer
+                    description: Expected time until the next phase in seconds
+                  queuePositionLocal:
+                    type: integer
+                    description: Patient's position in local queue
+                  queuePositionGlobal:
+                    type: integer
+                    description: Patient's position in the global queue
+                  queueMax:
+                    type: integer
+                    description: Maximum queue length
+                  allPatients:
+                    type: integer
+                    description: Total number of patients in the system
+        400:
+          description: Invalid request due to missing or malformed patient_id
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid patient_id format"
+        404:
+          description: Patient not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "no such patient_id {patient_id}"
     """
-
     queue_data = get_queue_stats(patient_id)
     patient_data = get_patient_data(patient_id)
     expected_time = compute_expected_time_seconds(patient_id)
