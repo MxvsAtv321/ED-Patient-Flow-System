@@ -5,7 +5,7 @@ import os
 
 
 # Set up your API keys
-OPENAI_API_KEY = "your_openai_api_key"
+OPENAI_API_KEY = "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"
 ELEVEN_LABS_API_KEY = "sk_80761db1aac9448c4e5d0f8f06d266fa8c761c1a036c34b5"
 API_URL = "https://api.elevenlabs.io/v1/text-to-speech/generate"
 
