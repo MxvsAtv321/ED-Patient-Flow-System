@@ -64,8 +64,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">Wait Time Uncertainty</h3>
       <p class="text-xs opacity-75">"When will I be seen? Am I forgotten?"</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• No clear position in queue</li>
-        <li>• Uncertainty breeds anxiety</li>
+        <li>No clear position in queue</li>
+        <li>Uncertainty breeds anxiety</li>
       </ul>
     </div>
   </div>
@@ -76,8 +76,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">Real-Time Updates</h3>
       <p class="text-xs opacity-75">Live queue position and wait time estimates</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• Clear position tracking</li>
-        <li>• Transparent wait estimates</li>
+        <li>Clear position tracking</li>
+        <li>Transparent wait estimates</li>
       </ul>
     </div>
   </div>
@@ -88,8 +88,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">Status Confusion</h3>
       <p class="text-xs opacity-75">"What's happening with my tests?"</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• Unclear progress tracking</li>
-        <li>• No visibility into next steps</li>
+        <li>Unclear progress tracking</li>
+        <li>No visibility into next steps</li>
       </ul>
     </div>
   </div>
@@ -100,8 +100,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">Smart Progress Tracking</h3>
       <p class="text-xs opacity-75">Visual journey map with test status updates</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• Real-time test status</li>
-        <li>• Clear next steps</li>
+        <li>Real-time test status</li>
+        <li>Clear next steps</li>
       </ul>
     </div>
   </div>
@@ -112,8 +112,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">Communication Barriers</h3>
       <p class="text-xs opacity-75">"I don't understand what's next."</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• Language barriers</li>
-        <li>• Medical terminology confusion</li>
+        <li>Language barriers</li>
+        <li>Medical terminology confusion</li>
       </ul>
     </div>
   </div>
@@ -124,8 +124,8 @@ transition: slide-up
       <h3 class="text-xs font-bold mb-0.5">AI-Powered Assistant</h3>
       <p class="text-xs opacity-75">24/7 multilingual support and explanations</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>• Multiple language support</li>
-        <li>• Plain language explanations</li>
+        <li>Multiple language support</li>
+        <li>Plain language explanations</li>
       </ul>
     </div>
   </div>
