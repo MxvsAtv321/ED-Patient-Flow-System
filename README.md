@@ -19,9 +19,8 @@ Transform Emergency Department waiting into a more bearable experience through a
 - Available in multiple languages with voice interface
 
 ### Patient Comfort
-- Nearby amenities information
+- Loved one status share 
 - Accessibility assistance options
-- Cultural and religious accommodation info
 
 ## 🛠 Technical Stack
 
@@ -34,7 +33,7 @@ Transform Emergency Department waiting into a more bearable experience through a
 
 ### Backend
 - Flask API
-- Redis for caching
+- SQLLite
 - OpenAI integration
 - WebSocket server
 - IFEM API integration
@@ -92,7 +91,8 @@ cp .env.example .env
 npm run dev
 
 # Backend
-bash scripts/run.sh```
+bash scripts/run.sh
+```
 
 ## 📈 Success Metrics
 - Reduction in status inquiries
