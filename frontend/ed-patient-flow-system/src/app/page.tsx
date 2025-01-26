@@ -10,7 +10,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { InfoIcon, ScanIcon, HeartPulse, ArrowLeftRight, XCircle, HelpCircle } from "lucide-react";
+import { InfoIcon, ScanIcon, HeartPulse, ArrowLeftRight, XCircle, HelpCircle, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const MotionButton = motion(Button);
@@ -31,23 +31,29 @@ const isValidPatientUrl = (url: string): boolean => {
 };
 
 export default function Home() {
-  const [scanning, setScanning] = useState(true);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showErrorDialog, setShowErrorDialog] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [scannedUrl, setScannedUrl] = useState<string | null>(null);
 
-  const handleScan = (result: { rawValue: string }[]) => {
+  const handleScan = async (result: { rawValue: string }[]) => {
     if (result.length > 0) {
-      const scannedUrl = result[0].rawValue;
-      console.log("Scanned URL:", scannedUrl);
+      const url = result[0].rawValue;
+      console.log("Scanned URL:", url);
       
-      if (!isValidPatientUrl(scannedUrl)) {
+      if (!isValidPatientUrl(url)) {
         setScanning(false);
         setShowErrorDialog(true);
         return;
       }
 
       setScanning(false);
-      window.location.href = scannedUrl;
+      setIsLoading(true);
+      setScannedUrl(url);
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      window.location.href = url;
     }
   };
 
@@ -173,6 +179,116 @@ export default function Home() {
               </h1>
             </motion.div>
 
+            {/* Hero Section - Only show when not scanning */}
+            {!scanning && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className="w-full max-w-4xl mb-8 text-center relative"
+              >
+                {/* Decorative background elements */}
+                <div className="absolute inset-0 -z-10 overflow-hidden">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 0.5 }}
+                    transition={{ delay: 0.2 }}
+                    className="absolute -top-[50%] -left-[50%] w-[200%] h-[200%] bg-[radial-gradient(circle_at_center,rgba(var(--primary-rgb),0.1),transparent_70%)]"
+                  />
+                  <motion.div
+                    animate={{ 
+                      rotate: [0, 360],
+                      scale: [1, 1.1, 1]
+                    }}
+                    transition={{ 
+                      duration: 20,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }}
+                    className="absolute inset-0 bg-[radial-gradient(circle_at_60%_50%,rgba(var(--primary-rgb),0.05),transparent_50%)]"
+                  />
+                </div>
+
+                {/* Main content */}
+                <div className="space-y-6">
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="space-y-3"
+                  >
+                    <motion.h2
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="text-4xl font-bold tracking-tight"
+                    >
+                      Welcome to{" "}
+                      <span className="relative">
+                        <span className="bg-gradient-to-r from-primary via-indigo-500 to-primary dark:from-primary dark:via-indigo-400 dark:to-primary text-transparent bg-clip-text">
+                          WaitWell
+                        </span>
+                        <motion.span
+                          initial={{ width: "0%" }}
+                          animate={{ width: "100%" }}
+                          transition={{ delay: 0.5, duration: 0.8 }}
+                          className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-primary/0 via-primary to-primary/0"
+                        />
+                      </span>
+                    </motion.h2>
+                    <motion.p
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                      className="text-xl text-muted-foreground/90 max-w-xl mx-auto leading-relaxed"
+                    >
+                      Track your emergency department wait time in real-time and stay informed about your care journey.
+                    </motion.p>
+                  </motion.div>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex flex-wrap justify-center gap-4 mt-6"
+                  >
+                    {[
+                      { 
+                        icon: <HeartPulse className="h-5 w-5" />, 
+                        text: "Real-time Updates",
+                        description: "Get instant updates on your wait time"
+                      },
+                      { 
+                        icon: <ArrowLeftRight className="h-5 w-5" />, 
+                        text: "Easy Check-in",
+                        description: "Simple QR code scanning process"
+                      },
+                      { 
+                        icon: <InfoIcon className="h-5 w-5" />, 
+                        text: "Status Tracking",
+                        description: "Know your position in the queue"
+                      },
+                    ].map((item, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.6 + index * 0.1 }}
+                        className="flex flex-col items-center gap-1.5 p-4 rounded-xl bg-background/50 backdrop-blur-sm border border-border/5 shadow-xl shadow-primary/5 hover:shadow-primary/10 transition-shadow duration-300 w-[220px]"
+                      >
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          {item.icon}
+                        </div>
+                        <h3 className="text-base font-semibold">{item.text}</h3>
+                        <p className="text-xs text-muted-foreground">{item.description}</p>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                </div>
+              </motion.div>
+            )}
+
             <div className="w-full max-w-xl">
               <MotionCard
                 initial={{ opacity: 0, y: 20 }}
@@ -208,7 +324,29 @@ export default function Home() {
                   </motion.div>
                 </CardHeader>
                 <CardContent className="space-y-4 relative">
-                  {scanning ? (
+                  {isLoading ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="py-8 flex flex-col items-center justify-center space-y-4"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="text-primary"
+                      >
+                        <Loader2 className="h-8 w-8" />
+                      </motion.div>
+                      <motion.p
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="text-muted-foreground text-sm"
+                      >
+                        Redirecting to your patient dashboard...
+                      </motion.p>
+                    </motion.div>
+                  ) : scanning ? (
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}

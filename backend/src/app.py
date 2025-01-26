@@ -1,5 +1,6 @@
 from flask import Flask, jsonify, request
 from flask_mail import Mail, Message
+from flask_cors import CORS
 from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
@@ -15,6 +16,7 @@ from tts.elevenlabs import speak_eleven_labs, listen
 from tts.openai import get_chatgpt_response
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 swagger = Swagger(app)
 
 client = OpenAI()
