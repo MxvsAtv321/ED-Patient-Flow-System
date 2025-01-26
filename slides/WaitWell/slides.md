@@ -1,6 +1,6 @@
 ---
 theme: default
-background: https://source.unsplash.com/collection/9372739/1920x1080
+background: https://images.unsplash.com/photo-1538108149393-fbbd81895907?q=80&w=2928&auto=format&fit=crop
 class: text-center
 highlighter: shiki
 lineNumbers: false
@@ -10,7 +10,7 @@ mdc: true
 ---
 
 # WaitWell
-<span class="text-xl text-blue-400">Transforming Emergency Department Experiences</span>
+<span class="text-xl text-emerald-300" style="text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;">Transforming Emergency Department Experiences</span>
 
 <div class="pt-12">
   <span @click="$slidev.nav.next" class="px-2 py-1 rounded cursor-pointer" hover="bg-white bg-opacity-10">
@@ -33,21 +33,65 @@ transition: fade-out
 
 # The Emergency Department Challenge
 
-<v-clicks>
+<div class="flex flex-col gap-4">
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-red-500/10">
+      <carbon:warning-alt class="w-5 h-5 text-red-500"/>
+    </div>
+    <p><span class="font-bold text-red-400">"I hope I'm going to be OK"</span></p>
+  </div>
 
-- Long, unpredictable wait times
-- Limited updates on status and progress
-- Growing anxiety as time passes
-- Language and communication barriers
-- Staff interrupted by status questions
-- Difficulty tracking test results
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-orange-500/10">
+      <carbon:time class="w-5 h-5 text-orange-500"/>
+    </div>
+    <p><span class="font-bold text-orange-400">"When will I be seen?"</span></p>
+  </div>
 
-</v-clicks>
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-yellow-500/10">
+      <carbon:user-follow class="w-5 h-5 text-yellow-500"/>
+    </div>
+    <p><span class="font-bold text-yellow-400">"When will the doctor be back?"</span></p>
+  </div>
+
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-blue-500/10">
+      <carbon:help class="w-5 h-5 text-blue-500"/>
+    </div>
+    <p><span class="font-bold text-blue-400">"Where am I in the queue?"</span></p>
+  </div>
+
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-purple-500/10">
+      <carbon:help-filled class="w-5 h-5 text-purple-500"/>
+    </div>
+    <p><span class="font-bold text-purple-400">"Have I been forgotten?"</span></p>
+  </div>
+
+  <div v-click class="flex items-center gap-3">
+    <div class="p-2 rounded-full bg-green-500/10">
+      <carbon:document-unknown class="w-5 h-5 text-green-500"/>
+    </div>
+    <p><span class="font-bold text-green-400">"When will my test results come back?"</span></p>
+  </div>
+</div>
 
 ::right::
 
-<div class="ml-4">
-  <img v-click src="https://images.unsplash.com/photo-1538108149393-fbbd81895907?q=80&w=2928&auto=format&fit=crop" class="rounded-lg shadow-xl" />
+<div class="ml-4 flex flex-col justify-center h-full">
+  <div v-click class="text-4xl font-bold text-center mb-4 leading-tight" style="background: linear-gradient(45deg, #ff6b6b 0%, #4ecdc4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    Every Patient's Voice Matters
+  </div>
+  <div v-click class="text-center text-gray-500 mb-8">
+    Real concerns from real patients
+  </div>
+  <div v-click class="text-2xl font-bold text-center mb-2" style="background: linear-gradient(45deg, #ff6b6b 0%, #4ecdc4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+    Anxiety & Uncertainty
+  </div>
+  <div v-click class="text-center text-gray-500">
+    The hidden cost of waiting
+  </div>
 </div>
 
 ---
@@ -55,17 +99,17 @@ layout: default
 transition: slide-up
 ---
 
-# Pain Points & Solutions
+# Patient Pain Points & Solutions
 
 <div class="grid grid-cols-2 gap-2 -mt-4">
   <!-- Problem 1 -->
   <div v-click class="transform transition-all duration-500">
     <div class="bg-red-500/10 p-1.5 rounded-lg">
       <h3 class="text-xs font-bold mb-0.5">Wait Time Uncertainty</h3>
-      <p class="text-xs opacity-75">"When will I be seen? Am I forgotten?"</p>
+      <p class="text-xs opacity-75">"When will I be seen? When will the doctor be back?"</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>No clear position in queue</li>
-        <li>Uncertainty breeds anxiety</li>
+        <li>No visibility into queue position</li>
+        <li>Unpredictable doctor return times</li>
       </ul>
     </div>
   </div>
@@ -73,11 +117,11 @@ transition: slide-up
   <!-- Solution 1 -->
   <div v-click class="transform transition-all duration-500">
     <div class="bg-green-500/10 p-1.5 rounded-lg">
-      <h3 class="text-xs font-bold mb-0.5">Real-Time Updates</h3>
-      <p class="text-xs opacity-75">Live queue position and wait time estimates</p>
+      <h3 class="text-xs font-bold mb-0.5">Real-Time Status</h3>
+      <p class="text-xs opacity-75">Live queue position and wait estimates</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>Clear position tracking</li>
-        <li>Transparent wait estimates</li>
+        <li>Clear position in queue</li>
+        <li>Estimated doctor return times</li>
       </ul>
     </div>
   </div>
@@ -86,7 +130,7 @@ transition: slide-up
   <div v-click class="transform transition-all duration-500">
     <div class="bg-red-500/10 p-1.5 rounded-lg">
       <h3 class="text-xs font-bold mb-0.5">Status Confusion</h3>
-      <p class="text-xs opacity-75">"What's happening with my tests?"</p>
+      <p class="text-xs opacity-75">"Why am I back in the waiting room?"</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
         <li>Unclear progress tracking</li>
         <li>No visibility into next steps</li>
@@ -97,11 +141,11 @@ transition: slide-up
   <!-- Solution 2 -->
   <div v-click class="transform transition-all duration-500">
     <div class="bg-green-500/10 p-1.5 rounded-lg">
-      <h3 class="text-xs font-bold mb-0.5">Smart Progress Tracking</h3>
-      <p class="text-xs opacity-75">Visual journey map with test status updates</p>
+      <h3 class="text-xs font-bold mb-0.5">Journey Tracking</h3>
+      <p class="text-xs opacity-75">Visual progress map of your ED visit</p>
       <ul class="text-xs mt-0.5 space-y-0.5 opacity-75 list-none">
-        <li>Real-time test status</li>
-        <li>Clear next steps</li>
+        <li>Clear progress indicators</li>
+        <li>Next steps always visible</li>
       </ul>
     </div>
   </div>
@@ -241,7 +285,7 @@ transition: fade-out
   </div>
   
   <div v-click class="text-sm opacity-75">
-    McHacks 2024 • IFEM Challenge
+    McHacks 12 • 2025 • IFEM Challenge
   </div>
 </div>
 
