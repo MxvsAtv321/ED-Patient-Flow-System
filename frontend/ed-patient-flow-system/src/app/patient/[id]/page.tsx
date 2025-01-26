@@ -11,8 +11,22 @@ import { Loader2, AlertCircle, Clock, ClipboardCheck, TestTube, Stethoscope, Arr
 import { ChatBot } from "@/components/ChatBot";
 import { EmailShare } from "@/components/EmailShare";
 
-const IFEM_API_BASE = "https://ifem-award-mchacks-2025.onrender.com/api/v1";
+const BACKEND_API_BASE = "http://localhost:5000";
 
+// Backend API response type
+interface BackendPatientData {
+  arrivalTime: string;
+  elapsedTime: number;
+  triage: string;
+  expectedTime: number;
+  queuePositionLocal: number;
+  queuePositionGlobal: number;
+  queueMax: number;
+  allPatients: number;
+  error?: string;
+}
+
+// Frontend patient data type
 interface PatientData {
   id: string;
   arrival_time: string;
@@ -424,13 +438,13 @@ export default function PatientPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const formatWaitTime = (minutes: number) => {
+  const formatWaitTime = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return `${hours}h ${mins}m`;
   };
 
-  const getCategoryLoad = (category: number) => {
+  const getCategoryLoad = (category: number): string => {
     if (!hospitalStats) return "Unknown";
     const count = hospitalStats.categoryBreakdown[category] || 0;
     const total = Object.values(hospitalStats.categoryBreakdown).reduce((a, b) => a + b, 0);
@@ -440,43 +454,6 @@ export default function PatientPage() {
     if (percentage < 66) return "Moderate";
     return "High";
   };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [patientResponse, statsResponse, queueResponse] = await Promise.all([
-          fetch(`${IFEM_API_BASE}/patient/${patientId}`),
-          fetch(`${IFEM_API_BASE}/stats/current`),
-          fetch(`${IFEM_API_BASE}/queue`)
-        ]);
-
-        if (!patientResponse.ok || !statsResponse.ok || !queueResponse.ok) {
-          throw new Error('Failed to fetch data');
-        }
-
-        const [patientData, statsData, queueData] = await Promise.all([
-          patientResponse.json(),
-          statsResponse.json(),
-          queueResponse.json()
-        ]);
-
-        setPatientData(patientData);
-        setHospitalStats(statsData);
-        setQueueData(queueData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setError('Failed to load data. Please try scanning your QR code again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-    
-    const intervalId = setInterval(fetchData, 30000);
-    
-    return () => clearInterval(intervalId);
-  }, [patientId]);
 
   const getExpectedWaitTime = () => {
     if (!patientData?.triage_category || !hospitalStats?.averageWaitTimes) {
@@ -495,6 +472,7 @@ export default function PatientPage() {
   };
 
   const getQueueInfo = () => {
+    const expectedWait = getExpectedWaitTime();
     if (!expectedWait || !patientData?.queue_position) return null;
     
     return (
@@ -512,6 +490,76 @@ export default function PatientPage() {
       </div>
     );
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const cleanPatientId = patientId.replace('anon_', '');
+        
+        const response = await fetch(`${BACKEND_API_BASE}/patient/${cleanPatientId}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const data = await response.json() as BackendPatientData;
+        
+        if ('error' in data && data.error) {
+          setError(data.error);
+          return;
+        }
+
+        // Transform backend data to frontend format
+        const patientInfo: PatientData = {
+          id: cleanPatientId,
+          arrival_time: data.arrivalTime,
+          triage_category: parseInt(data.triage),
+          queue_position: {
+            global: data.queuePositionGlobal,
+            category: data.queuePositionLocal
+          },
+          status: {
+            current_phase: 'registered',
+            investigations: {
+              labs: 'NA',
+              imaging: 'NA'
+            }
+          },
+          time_elapsed: data.elapsedTime
+        };
+
+        const statsData: HospitalStats = {
+          categoryBreakdown: {
+            [patientInfo.triage_category.toString()]: data.queueMax
+          },
+          averageWaitTimes: {
+            [patientInfo.triage_category.toString()]: data.expectedTime
+          }
+        };
+
+        const queueInfo: QueueData = {
+          waitingCount: data.allPatients,
+          longestWaitTime: data.expectedTime,
+          patients: [patientInfo]
+        };
+
+        setPatientData(patientInfo);
+        setHospitalStats(statsData);
+        setQueueData(queueInfo);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        setError('Failed to load data. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void fetchData();
+    
+    const intervalId = setInterval(() => void fetchData(), 30000);
+    
+    return () => clearInterval(intervalId);
+  }, [patientId]);
 
   if (loading) {
     return (
@@ -547,7 +595,7 @@ export default function PatientPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Patient Not Found</AlertTitle>
           <AlertDescription>
-            We couldn't find your patient record. Please try scanning your QR code again.
+            We couldn't find your patient record. Please try again later.
           </AlertDescription>
         </Alert>
       </div>
@@ -785,35 +833,88 @@ export default function PatientPage() {
           <p className="text-muted-foreground mt-2 relative">
             Tracking your progress through the Emergency Department
           </p>
-          {patientData?.time_elapsed && (
-            <motion.div 
-              className="mt-4 flex items-center justify-center gap-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Badge variant="outline" className="text-sm bg-orange-500/10 text-orange-500 px-3 py-1 relative overflow-hidden group">
-                <motion.div
-                  className="absolute inset-0 bg-gradient-to-r from-orange-500/0 via-orange-500/20 to-orange-500/0"
-                  animate={{
-                    x: ['-200%', '200%'],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                />
-                <span className="relative">
-                  {Math.floor(patientData.time_elapsed / 60)}h {patientData.time_elapsed % 60}m elapsed
-                </span>
-              </Badge>
-              <Badge variant="outline" className="text-sm px-3 py-1">
-                Patient ID: {patientData.id}
-              </Badge>
-            </motion.div>
-          )}
         </motion.div>
+
+        {/* New Prominent Wait Time Section */}
+        {patientData && hospitalStats && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-3xl mb-12"
+          >
+            <Card className="relative overflow-hidden">
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+                animate={{
+                  opacity: [0.5, 0.8, 0.5],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              <div className="relative p-8 flex flex-col items-center text-center space-y-6">
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-semibold text-muted-foreground">Estimated Wait Time</h2>
+                  <div className="flex items-center justify-center gap-3">
+                    <Clock className="h-8 w-8 text-primary animate-pulse" />
+                    <span className="text-5xl font-bold text-primary">
+                      {(() => {
+                        const waitTime = hospitalStats.averageWaitTimes[patientData.triage_category] || 0;
+                        const elapsedTime = patientData.time_elapsed;
+                        const remainingTime = Math.max(0, waitTime - elapsedTime);
+                        const hours = Math.floor(remainingTime / 60);
+                        const minutes = remainingTime % 60;
+                        return `${hours}h ${minutes}m`;
+                      })()}
+                    </span>
+                  </div>
+                  <motion.div
+                    className="w-full max-w-xs mx-auto h-2 bg-muted rounded-full overflow-hidden mt-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <motion.div
+                      className="h-full bg-primary"
+                      initial={{ width: 0 }}
+                      animate={{ 
+                        width: `${Math.min(100, (patientData.time_elapsed / (hospitalStats.averageWaitTimes[patientData.triage_category] || 1)) * 100)}%` 
+                      }}
+                      transition={{ duration: 1, delay: 0.7 }}
+                    />
+                  </motion.div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-8 w-full max-w-lg">
+                  <div className="space-y-1 text-center">
+                    <p className="text-2xl font-semibold text-foreground">
+                      {Math.floor(patientData.time_elapsed / 60)}h {patientData.time_elapsed % 60}m
+                    </p>
+                    <p className="text-sm text-muted-foreground">Time Elapsed</p>
+                  </div>
+                  <div className="space-y-1 text-center">
+                    <p className="text-2xl font-semibold text-foreground">
+                      #{patientData.queue_position.category}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Queue Position</p>
+                  </div>
+                  <div className="space-y-1 text-center">
+                    <Badge variant="outline" className={
+                      getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500 text-lg px-3 py-1" :
+                      getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500 text-lg px-3 py-1" :
+                      "bg-red-500/10 text-red-500 text-lg px-3 py-1"
+                    }>
+                      {getCategoryLoad(patientData.triage_category)}
+                    </Badge>
+                    <p className="text-sm text-muted-foreground">Current Load</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
 
         <div className="w-full max-w-6xl">
           <motion.div 
@@ -1096,7 +1197,7 @@ export default function PatientPage() {
         {/* ChatBot */}
         {patientData && (
           <div className="relative z-50">
-            <ChatBot patientId={patientData.id} />
+            <ChatBot patientId={patientId} />
           </div>
         )}
       </div>
