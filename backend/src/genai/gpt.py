@@ -1,14 +1,34 @@
+import os
+import google.generativeai as genai
 from dotenv import load_dotenv
 from hospital_data.hospital_api import get_patient_data
 load_dotenv()
 
-def get_chatgpt_response(openai_client:any,user_message:str,patient_id:str):
+def get_chatgpt_response(openai_client:any, user_message:str, patient_id:str):
+    GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    
+    generation_config = {
+        "temperature": 1,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 8192,
+        "response_mime_type": "text/plain",
+    }
+
+    model = genai.GenerativeModel(
+        model_name="gemini-2.0-flash-exp",
+        generation_config=generation_config,
+    )
+
     system_message = """You are a helpful chatbot designed to assist patients in the emergency room. 
         Explain medical terms clearly, provide reassurance, and answer questions about the ED process. Keep your answers concise and to the point. Do not under any circumstance give medical advice."""
 
-    patient_context=""
+    patient_context = ""
     if patient_id:
-        #formatted_id = f"anon_{patient_id}"
         patient_info = get_patient_data(patient_id)
         if patient_info:
             patient_context = f"""
@@ -21,7 +41,6 @@ def get_chatgpt_response(openai_client:any,user_message:str,patient_id:str):
                 Imaging: {patient_info.imaging}
             """
             system_message += "\n" + patient_context
-    message = ""
     
     if patient_context:
         message = f"""
@@ -41,14 +60,9 @@ def get_chatgpt_response(openai_client:any,user_message:str,patient_id:str):
         Do not under any circumstance give medical advice.
         """
 
-    response = openai_client.chat.completions.create(
-        model="gpt-4",
-        messages=[ 
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": message}
-        ],
-        #max_tokens=450
-    )
-
-    bot_reply = response.choices[0].message.content
-    return bot_reply
+    chat = model.start_chat(history=[
+        {"role": "user", "parts": [system_message]},
+    ])
+    
+    response = chat.send_message(message)
+    return response.text
