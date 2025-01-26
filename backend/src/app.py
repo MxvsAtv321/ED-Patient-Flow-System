@@ -4,7 +4,6 @@ from flask_cors import CORS
 from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
-#import openai
 from openai import OpenAI
 
 from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
@@ -136,24 +135,6 @@ paths:
         "patientNumberByCat": get_patient_number_by_cat(),
         "expectedWaitTimesByCat": get_wait_times_by_cat()
     })
-
-"""
-// Backend API response type
-interface BackendPatientData {
-  arrivalTime: string;
-  elapsedTime: number;
-  triage: string;
-  expectedTime: number;
-  queuePositionLocal: number;
-  queuePositionGlobal: number;
-  queueMax: number;
-  allPatients: number;
-  currentPhase: string;
-  labs: string;
-  imaging: string;
-  error?: string;
-}
-"""
 
 @app.route("/email/<patient_id>", methods=["POST"])
 def send_email(patient_id: str):

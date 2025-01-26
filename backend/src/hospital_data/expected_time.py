@@ -20,7 +20,7 @@ def get_wait_times_by_cat() -> List[int]:
     categories = [1,2,3,4,5]
     
     return [
-        _sum_of_wait_times(patients, category)/5
+        _sum_of_wait_times(patients, category)
         for category in categories
     ]
 
@@ -32,7 +32,6 @@ def get_patient_number_by_cat() -> List[int]:
         len([p for p in patients if int(p.triage_category) == category])
         for category in categories
     ]
-
 
 def longest_wait_time() -> int:
     patients = get_all_patient_data()
