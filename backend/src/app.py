@@ -5,7 +5,6 @@ from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
 from openai import OpenAI
-import groq
 import base64
 
 from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
@@ -21,7 +20,6 @@ CORS(app)
 swagger = Swagger(app)
 app.config.from_pyfile('config.py')
 openai_client = OpenAI()
-groq_client = groq.Client()
 
 logging.basicConfig(
     level=logging.INFO, 
