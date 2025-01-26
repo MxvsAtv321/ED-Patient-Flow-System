@@ -5,15 +5,14 @@ from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
 from openai import OpenAI
-#from dotenv import load_dotenv
 
 from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
 from hospital_data.create_db import save_hospital_data
 from hospital_data.hospital_api import get_patient_data, get_all_patient_data
 from hospital_data.queue_data import get_queue_stats
 
-from tts.elevenlabs import speak_eleven_labs, listen
-from gpt import get_chatgpt_response
+from genai.elevenlabs import speak_eleven_labs, listen
+from genai.gpt import get_chatgpt_response
 
 app = Flask(__name__)
 CORS(app)
