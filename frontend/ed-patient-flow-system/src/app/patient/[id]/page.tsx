@@ -7,13 +7,13 @@ import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
-import { Loader2, AlertCircle, Clock, ClipboardCheck, TestTube, Stethoscope, ArrowRight, HelpCircle, User } from "lucide-react";
+import { Loader2, AlertCircle, Clock, ClipboardCheck, TestTube, Stethoscope, ArrowRight, HelpCircle, User, HeartPulse } from "lucide-react";
 import { ChatBot } from "@/components/ChatBot";
 import { EmailShare } from "@/components/EmailShare";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-const BACKEND_API_BASE = "http://localhost:5000";
+const BACKEND_API_BASE = "https://66b9ae68c8ee.ngrok.app/";
 
-// Backend API response type
 interface BackendPatientData {
   arrivalTime: string;
   elapsedTime: number;
@@ -23,10 +23,13 @@ interface BackendPatientData {
   queuePositionGlobal: number;
   queueMax: number;
   allPatients: number;
-  error?: string;
+  currentPhase: string;
+  labs: string;
+  imaging: string;
+  expectedWaitTimesByCat: number[];
+  patientNumberByCat: number[];
 }
 
-// Frontend patient data type
 interface PatientData {
   id: string;
   arrival_time: string;
@@ -43,6 +46,7 @@ interface PatientData {
     };
   };
   time_elapsed: number;
+  expectedTime: number;
 }
 
 interface HospitalStats {
@@ -231,17 +235,17 @@ const WaitTimeStats = ({
   };
 
   const getEstimatedCompletion = () => {
-    const waitTime = hospitalStats.averageWaitTimes[patientCategory] || 0;
-    const elapsedTime = patientData.time_elapsed;
-    const remainingTime = Math.max(0, waitTime - elapsedTime);
+    if (!patientData) return { remaining: "0h 0m", time: "--:--", progress: 0 };
     
+    const remainingTime = Math.max(0, patientData.expectedTime - patientData.time_elapsed);
     const now = new Date();
     const completionTime = new Date(now.getTime() + remainingTime * 60000);
+    const progress = (patientData.time_elapsed / patientData.expectedTime) * 100;
     
     return {
       remaining: formatWaitTime(remainingTime),
       time: completionTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      progress: Math.min(100, (elapsedTime / waitTime) * 100)
+      progress: Math.min(100, progress)
     };
   };
 
@@ -413,11 +417,22 @@ const WaitTimeStats = ({
                 <p className="text-xs text-muted-foreground">Time Elapsed</p>
               </div>
               <div>
-                <p className="text-sm font-medium">{estimatedCompletion.remaining}</p>
+                <p className="text-sm font-medium">
+                  {(() => {
+                    if (!patientData || !hospitalStats) return "0h 0m";
+                    const remainingTime = Math.max(0, patientData.expectedTime - patientData.time_elapsed);
+                    return formatWaitTime(remainingTime);
+                  })()}
+                </p>
                 <p className="text-xs text-muted-foreground">Estimated Remaining</p>
               </div>
               <div>
-                <p className="text-sm font-medium">{formatWaitTime(hospitalStats.averageWaitTimes[patientCategory])}</p>
+                <p className="text-sm font-medium">
+                  {(() => {
+                    if (!patientData) return "0h 0m";
+                    return formatWaitTime(patientData.expectedTime);
+                  })()}
+                </p>
                 <p className="text-xs text-muted-foreground">Average Total</p>
               </div>
             </div>
@@ -456,19 +471,8 @@ export default function PatientPage() {
   };
 
   const getExpectedWaitTime = () => {
-    if (!patientData?.triage_category || !hospitalStats?.averageWaitTimes) {
-      return null;
-    }
-
-    const waitTimeMinutes = hospitalStats.averageWaitTimes[patientData.triage_category];
-    if (typeof waitTimeMinutes !== 'number') {
-      return null;
-    }
-
-    const hours = Math.floor(waitTimeMinutes / 60);
-    const minutes = waitTimeMinutes % 60;
-    
-    return { hours, minutes, total: waitTimeMinutes };
+    if (!patientData) return null;
+    return { hours: Math.floor(patientData.expectedTime / 60), minutes: patientData.expectedTime % 60, total: patientData.expectedTime };
   };
 
   const getQueueInfo = () => {
@@ -494,9 +498,7 @@ export default function PatientPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const cleanPatientId = patientId.replace('anon_', '');
-        
-        const response = await fetch(`${BACKEND_API_BASE}/patient/${cleanPatientId}`);
+        const response = await fetch(`${BACKEND_API_BASE}/patient/${patientId}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch data');
@@ -504,14 +506,9 @@ export default function PatientPage() {
 
         const data = await response.json() as BackendPatientData;
         
-        if ('error' in data && data.error) {
-          setError(data.error);
-          return;
-        }
-
-        // Transform backend data to frontend format
+        // Transform the raw data into our frontend format
         const patientInfo: PatientData = {
-          id: cleanPatientId,
+          id: patientId,
           arrival_time: data.arrivalTime,
           triage_category: parseInt(data.triage),
           queue_position: {
@@ -519,22 +516,29 @@ export default function PatientPage() {
             category: data.queuePositionLocal
           },
           status: {
-            current_phase: 'registered',
+            current_phase: data.currentPhase,
             investigations: {
-              labs: 'NA',
-              imaging: 'NA'
+              labs: data.labs,
+              imaging: data.imaging
             }
           },
-          time_elapsed: data.elapsedTime
+          time_elapsed: data.elapsedTime,
+          expectedTime: data.expectedTime
         };
 
+        // Transform the arrays into objects for easier access
+        const categoryBreakdown: Record<string, number> = {};
+        const waitTimes: Record<string, number> = {};
+        
+        // Map the arrays to their respective categories (1-5)
+        for (let i = 0; i < data.patientNumberByCat.length; i++) {
+          categoryBreakdown[i + 1] = data.patientNumberByCat[i];
+          waitTimes[i + 1] = data.expectedWaitTimesByCat[i];
+        }
+
         const statsData: HospitalStats = {
-          categoryBreakdown: {
-            [patientInfo.triage_category.toString()]: data.queueMax
-          },
-          averageWaitTimes: {
-            [patientInfo.triage_category.toString()]: data.expectedTime
-          }
+          categoryBreakdown,
+          averageWaitTimes: waitTimes
         };
 
         const queueInfo: QueueData = {
@@ -771,436 +775,386 @@ export default function PatientPage() {
   const progress = steps.filter(step => step.isComplete).length / steps.length * 100;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background/80 to-background relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <TooltipProvider>
+      <main className="min-h-screen bg-gradient-to-b from-background via-background/80 to-background relative overflow-hidden">
         <motion.div 
-          className="absolute -top-[40%] -left-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-br from-primary/20 via-primary/5 to-transparent blur-3xl"
-          animate={{
-            scale: [1, 1.1, 1],
-            opacity: [0.3, 0.4, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div 
-          className="absolute -bottom-[40%] -right-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-br from-blue-500/20 via-indigo-500/5 to-transparent blur-3xl"
-          animate={{
-            scale: [1.1, 1, 1.1],
-            opacity: [0.3, 0.4, 0.3],
-          }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      </div>
-
-      <div className="relative min-h-screen flex flex-col items-center justify-center p-4">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8 relative"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="hidden lg:flex fixed top-0 left-0 w-full h-16 bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl border-b border-border/40 shadow-sm items-center justify-between px-8 z-50"
         >
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 blur-3xl"
+          <div className="flex items-center space-x-3">
+            <Tooltip>
+              <TooltipTrigger>
+                <motion.div 
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="p-2 rounded-lg bg-primary/10 dark:bg-primary/20 transition-colors hover:bg-primary/20 dark:hover:bg-primary/30"
+                >
+                  <HeartPulse className="h-5 w-5 text-primary animate-pulse" />
+                </motion.div>
+              </TooltipTrigger>
+              <TooltipContent>Emergency Department Patient Flow</TooltipContent>
+            </Tooltip>
+            <motion.h1 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="text-xl font-bold bg-gradient-to-r from-primary to-indigo-500 dark:from-primary dark:to-indigo-400 text-transparent bg-clip-text"
+            >
+              WaitWell
+            </motion.h1>
+          </div>
+          <div className="flex items-center space-x-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium">
+                <motion.div 
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="w-2 h-2 rounded-full bg-green-500 mr-2"
+                />
+                Live Updates
+              </Badge>
+            </motion.div>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-full bg-muted/50 dark:bg-muted/20 text-muted-foreground"
+            >
+              <Clock className="h-4 w-4" />
+              <span>Real-time tracking</span>
+            </motion.div>
+          </div>
+        </motion.div>
+
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div 
+            className="absolute -top-[40%] -left-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-br from-primary/20 via-primary/5 to-transparent blur-3xl"
             animate={{
-              opacity: [0.5, 0.8, 0.5],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-          <motion.h1 
-            className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/50 relative"
-            animate={{
-              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              scale: [1, 1.1, 1],
+              opacity: [0.3, 0.4, 0.3],
             }}
             transition={{
               duration: 8,
               repeat: Infinity,
-              ease: "linear",
+              ease: "easeInOut",
             }}
-            style={{ backgroundSize: '200% auto' }}
-          >
-            Your ED Journey
-          </motion.h1>
-          <p className="text-muted-foreground mt-2 relative">
-            Tracking your progress through the Emergency Department
-          </p>
-        </motion.div>
+          />
+          <motion.div 
+            className="absolute -bottom-[40%] -right-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-br from-blue-500/20 via-indigo-500/5 to-transparent blur-3xl"
+            animate={{
+              scale: [1.1, 1, 1.1],
+              opacity: [0.3, 0.4, 0.3],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
 
-        {/* New Prominent Wait Time Section */}
-        {patientData && hospitalStats && (
+        <div className="relative min-h-screen flex flex-col items-center justify-center p-4 pt-24 lg:pt-32">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-3xl mb-12"
+            className="text-center mb-8 relative"
           >
-            <Card className="relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
-                animate={{
-                  opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <div className="relative p-8 flex flex-col items-center text-center space-y-6">
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold text-muted-foreground">Estimated Wait Time</h2>
-                  <div className="flex items-center justify-center gap-3">
-                    <Clock className="h-8 w-8 text-primary animate-pulse" />
-                    <span className="text-5xl font-bold text-primary">
-                      {(() => {
-                        const waitTime = hospitalStats.averageWaitTimes[patientData.triage_category] || 0;
-                        const elapsedTime = patientData.time_elapsed;
-                        const remainingTime = Math.max(0, waitTime - elapsedTime);
-                        const hours = Math.floor(remainingTime / 60);
-                        const minutes = remainingTime % 60;
-                        return `${hours}h ${minutes}m`;
-                      })()}
-                    </span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 blur-3xl"
+              animate={{
+                opacity: [0.5, 0.8, 0.5],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+            <motion.h1 
+              className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/50 relative"
+              animate={{
+                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              }}
+              transition={{
+                duration: 8,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              style={{ backgroundSize: '200% auto' }}
+            >
+              Your ED Timeline
+            </motion.h1>
+            <p className="text-muted-foreground mt-2 relative">
+              Live updates on your progress through the Emergency Department
+            </p>
+          </motion.div>
+
+          <div className="w-full max-w-6xl">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="relative rounded-xl p-12 overflow-hidden"
+            >
+              <div className="relative">
+                <div className="absolute top-10 left-0 right-0">
+                  <div className="h-[2px] bg-border/30 relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-border/0 via-border/50 to-border/0" />
                   </div>
-                  <motion.div
-                    className="w-full max-w-xs mx-auto h-2 bg-muted rounded-full overflow-hidden mt-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
+                </div>
+
+                <div className="absolute top-10 left-0 right-0">
+                  <motion.div 
+                    className="relative h-[2px]"
+                    style={{
+                      background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary) 100%)',
+                      boxShadow: '0 0 20px var(--primary)',
+                      width: `${progress}%`,
+                    }}
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ 
+                      width: `${progress}%`,
+                      opacity: 1,
+                    }}
+                    transition={{ duration: 1, delay: 0.5, ease: "easeInOut" }}
                   >
                     <motion.div
-                      className="h-full bg-primary"
-                      initial={{ width: 0 }}
-                      animate={{ 
-                        width: `${Math.min(100, (patientData.time_elapsed / (hospitalStats.averageWaitTimes[patientData.triage_category] || 1)) * 100)}%` 
+                      className="absolute top-0 right-0 w-12 h-[2px]"
+                      style={{
+                        background: 'linear-gradient(90deg, rgba(var(--primary), 0) 0%, var(--primary) 50%, rgba(var(--primary), 0) 100%)',
+                        filter: 'blur(4px)',
                       }}
-                      transition={{ duration: 1, delay: 0.7 }}
+                      animate={{
+                        opacity: [0.3, 1, 0.3],
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                    <motion.div
+                      className="absolute -right-1 -top-[3px] w-2 h-2 rounded-full bg-primary"
+                      style={{
+                        boxShadow: '0 0 10px var(--primary)',
+                      }}
+                      animate={{
+                        scale: [1, 1.3, 1],
+                        opacity: [0.7, 1, 0.7],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
                     />
                   </motion.div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-8 w-full max-w-lg">
-                  <div className="space-y-1 text-center">
-                    <p className="text-2xl font-semibold text-foreground">
-                      {Math.floor(patientData.time_elapsed / 60)}h {patientData.time_elapsed % 60}m
-                    </p>
-                    <p className="text-sm text-muted-foreground">Time Elapsed</p>
-                  </div>
-                  <div className="space-y-1 text-center">
-                    <p className="text-2xl font-semibold text-foreground">
-                      #{patientData.queue_position.category}
-                    </p>
-                    <p className="text-sm text-muted-foreground">Queue Position</p>
-                  </div>
-                  <div className="space-y-1 text-center">
-                    <Badge variant="outline" className={
-                      getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500 text-lg px-3 py-1" :
-                      getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500 text-lg px-3 py-1" :
-                      "bg-red-500/10 text-red-500 text-lg px-3 py-1"
-                    }>
-                      {getCategoryLoad(patientData.triage_category)}
-                    </Badge>
-                    <p className="text-sm text-muted-foreground">Current Load</p>
-                  </div>
+                <div className="grid grid-cols-6 gap-8">
+                  {steps.map((step, index) => (
+                    <TimelineStep
+                      key={step.title}
+                      {...step}
+                      delay={index * 0.2}
+                    />
+                  ))}
                 </div>
               </div>
-            </Card>
-          </motion.div>
-        )}
+            </motion.div>
+          </div>
 
-        <div className="w-full max-w-6xl">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative rounded-xl p-12 overflow-hidden"
-          >
-            <div className="relative">
-              <div className="absolute top-10 left-0 right-0">
-                <div className="h-[2px] bg-border/30 relative">
-                  <div className="absolute inset-0 bg-gradient-to-r from-border/0 via-border/50 to-border/0" />
-                </div>
-              </div>
-
-              <div className="absolute top-10 left-0 right-0">
-                <motion.div 
-                  className="relative h-[2px]"
-                  style={{
-                    background: 'linear-gradient(90deg, var(--primary) 0%, var(--primary) 100%)',
-                    boxShadow: '0 0 20px var(--primary)',
-                    width: `${progress}%`,
+          {/* New Prominent Wait Time Section */}
+          {patientData && hospitalStats && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="w-full max-w-3xl mb-12"
+            >
+              <Card className="relative overflow-hidden">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+                  animate={{
+                    opacity: [0.5, 0.8, 0.5],
                   }}
-                  initial={{ width: 0, opacity: 0 }}
-                  animate={{ 
-                    width: `${progress}%`,
-                    opacity: 1,
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
                   }}
-                  transition={{ duration: 1, delay: 0.5, ease: "easeInOut" }}
-                >
-                  <motion.div
-                    className="absolute top-0 right-0 w-12 h-[2px]"
-                    style={{
-                      background: 'linear-gradient(90deg, rgba(var(--primary), 0) 0%, var(--primary) 50%, rgba(var(--primary), 0) 100%)',
-                      filter: 'blur(4px)',
-                    }}
-                    animate={{
-                      opacity: [0.3, 1, 0.3],
-                      scale: [1, 1.2, 1],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                  <motion.div
-                    className="absolute -right-1 -top-[3px] w-2 h-2 rounded-full bg-primary"
-                    style={{
-                      boxShadow: '0 0 10px var(--primary)',
-                    }}
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.7, 1, 0.7],
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                </motion.div>
-              </div>
-
-              <div className="grid grid-cols-6 gap-8">
-                {steps.map((step, index) => (
-                  <TimelineStep
-                    key={step.title}
-                    {...step}
-                    delay={index * 0.2}
-                  />
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Stats Panels */}
-        {patientData && hospitalStats && queueData && (
-          <div className="w-full max-w-3xl mx-auto mt-8 space-y-4">
-            {/* Your Position Panel */}
-            <Card className="relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
-                animate={{
-                  opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              
-              <div className="relative p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold">Your Position</h3>
-                    <p className="text-sm text-muted-foreground mt-1">#{patientData.queue_position.global} Overall</p>
+                />
+                <div className="relative p-8 flex flex-col items-center text-center space-y-6">
+                  <div className="space-y-2">
+                    <h2 className="text-2xl font-semibold text-muted-foreground">Estimated Wait Time</h2>
+                    <div className="flex items-center justify-center gap-3">
+                      <Clock className="h-8 w-8 text-primary animate-pulse" />
+                      <span className="text-5xl font-bold text-primary">
+                        {(() => {
+                          if (!patientData) return "0h 0m";
+                          const hours = Math.floor(patientData.expectedTime / 60);
+                          const minutes = patientData.expectedTime % 60;
+                          return `${hours}h ${minutes}m`;
+                        })()}
+                      </span>
+                    </div>
+                    <motion.div
+                      className="w-full max-w-xs mx-auto h-2 bg-muted rounded-full overflow-hidden mt-4"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <motion.div
+                        className="h-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ 
+                          width: (() => {
+                            if (!patientData) return "0%";
+                            return `${Math.min(100, (patientData.time_elapsed / patientData.expectedTime) * 100)}%`;
+                          })()
+                        }}
+                        transition={{ duration: 1, delay: 0.7 }}
+                      />
+                    </motion.div>
                   </div>
-                  <EmailShare patientId={patientId} />
-                </div>
 
-                <div className="space-y-6">
-                  {(() => {
-                    const getEstimatedCompletion = () => {
-                      const waitTime = hospitalStats.averageWaitTimes[patientData.triage_category] || 0;
-                      const elapsedTime = patientData.time_elapsed;
-                      const remainingTime = Math.max(0, waitTime - elapsedTime);
-                      
-                      const now = new Date();
-                      const completionTime = new Date(now.getTime() + remainingTime * 60000);
-                      
-                      return {
-                        remaining: formatWaitTime(remainingTime),
-                        time: completionTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        progress: Math.min(100, (elapsedTime / waitTime) * 100)
-                      };
-                    };
-
-                    const estimatedCompletion = getEstimatedCompletion();
-
-                    return (
-                      <>
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-muted-foreground">Queue Progress</span>
-                            <span className="font-medium">{Math.round(estimatedCompletion.progress)}%</span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <motion.div
-                              className="h-full bg-primary"
-                              initial={{ width: 0 }}
-                              animate={{ width: `${estimatedCompletion.progress}%` }}
-                              transition={{ duration: 1 }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <Card className="p-4 space-y-2">
-                            <p className="text-sm text-muted-foreground">Category Position</p>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={`${
-                                TRIAGE_COLORS[patientData.triage_category as keyof typeof TRIAGE_COLORS]?.text
-                              } ${
-                                TRIAGE_COLORS[patientData.triage_category as keyof typeof TRIAGE_COLORS]?.bg.replace('bg-', 'bg-opacity-10')
-                              }`}>
-                                #{patientData.queue_position.category}
-                              </Badge>
-                              <span className="text-sm">
-                                of {hospitalStats.categoryBreakdown[patientData.triage_category]} in Level {patientData.triage_category}
-                              </span>
-                            </div>
-                          </Card>
-
-                          <Card className="p-4 space-y-2">
-                            <p className="text-sm text-muted-foreground">Estimated Completion</p>
-                            <div className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-primary" />
-                              <span className="text-sm">
-                                ~{estimatedCompletion.time}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {estimatedCompletion.remaining} remaining
-                            </p>
-                          </Card>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          <div>
-                            <p className="text-sm font-medium">{formatWaitTime(patientData.time_elapsed)}</p>
-                            <p className="text-xs text-muted-foreground">Time Elapsed</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{estimatedCompletion.remaining}</p>
-                            <p className="text-xs text-muted-foreground">Estimated Remaining</p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">{formatWaitTime(hospitalStats.averageWaitTimes[patientData.triage_category])}</p>
-                            <p className="text-xs text-muted-foreground">Average Total</p>
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            </Card>
-
-            {/* Current ED Status Panel */}
-            <Card className="relative overflow-hidden">
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
-                animate={{
-                  opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              
-              <div className="relative p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Current ED Status</h3>
-                  <Badge variant="outline" className="bg-primary/10 text-primary">
-                    Live Updates
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Card className="p-4 space-y-2">
-                    <p className="text-sm text-muted-foreground">Current Load</p>
-                    <div className="flex items-center gap-2">
+                  <div className="grid grid-cols-3 gap-8 w-full max-w-lg">
+                    <div className="space-y-1 text-center">
+                      <p className="text-2xl font-semibold text-foreground">
+                        {Math.floor(patientData.time_elapsed / 60)}h {patientData.time_elapsed % 60}m
+                      </p>
+                      <p className="text-sm text-muted-foreground">Time Elapsed</p>
+                    </div>
+                    <div className="space-y-1 text-center">
+                      <p className="text-2xl font-semibold text-foreground">
+                        #{patientData.queue_position.category}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Queue Position</p>
+                    </div>
+                    <div className="space-y-1 text-center">
                       <Badge variant="outline" className={
-                        getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500" :
-                        getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500" :
-                        "bg-red-500/10 text-red-500"
+                        getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500 text-lg px-3 py-1" :
+                        getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500 text-lg px-3 py-1" :
+                        "bg-red-500/10 text-red-500 text-lg px-3 py-1"
                       }>
                         {getCategoryLoad(patientData.triage_category)}
                       </Badge>
-                      <span className="text-sm">
-                        {hospitalStats.categoryBreakdown[patientData.triage_category]} patients in your category
-                      </span>
+                      <p className="text-sm text-muted-foreground">Current Load</p>
                     </div>
-                  </Card>
+                  </div>
 
-                  <Card className="p-4 space-y-2">
-                    <p className="text-sm text-muted-foreground">Estimated Wait</p>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-primary" />
-                      <span className="text-sm">
-                        ~{formatWaitTime(hospitalStats.averageWaitTimes[patientData.triage_category])}
-                      </span>
-                    </div>
-                  </Card>
-
-                  <Card className="p-4 space-y-2">
-                    <p className="text-sm text-muted-foreground">Total Waiting</p>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-primary" />
-                      <span className="text-sm">
-                        {queueData.waitingCount} patients
-                      </span>
-                    </div>
-                  </Card>
-                </div>
-
-                <div className="space-y-4">
-                  <h4 className="text-sm font-medium">Wait Times by Category</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                    {Object.entries(hospitalStats.averageWaitTimes).map(([category, time]) => (
-                      <Card 
-                        key={category}
-                        className={`p-3 ${Number(category) === patientData.triage_category ? 'ring-2 ring-primary' : ''}`}
-                      >
-                        <div className="space-y-1">
-                          <Badge variant="outline" className={`w-full justify-center ${
-                            TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.text
-                          } ${
-                            TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.bg.replace('bg-', 'bg-opacity-10')
-                          }`}>
-                            Level {category}
-                          </Badge>
-                          <p className="text-xs text-center text-muted-foreground">
-                            ~{formatWaitTime(time)}
-                          </p>
-                        </div>
-                      </Card>
-                    ))}
+                  <div className="w-72 mt-4 pt-4 border-t border-border/30">
+                    <EmailShare patientId={patientId} />
                   </div>
                 </div>
-              </div>
-            </Card>
-          </div>
-        )}
+              </Card>
+            </motion.div>
+          )}
 
-        {/* ChatBot */}
-        {patientData && (
-          <div className="relative z-50">
-            <ChatBot patientId={patientId} />
-          </div>
-        )}
-      </div>
-    </main>
+          {/* Stats Panels */}
+          {patientData && hospitalStats && queueData && (
+            <div className="w-full max-w-3xl mx-auto mt-8 space-y-4">
+              {/* Current ED Status Panel */}
+              <Card className="relative overflow-hidden">
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+                  animate={{
+                    opacity: [0.5, 0.8, 0.5],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                />
+                
+                <div className="relative p-6 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Current ED Status</h3>
+                    <Badge variant="outline" className="bg-primary/10 text-primary">
+                      Live Updates
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="p-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">Current Load</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={
+                          getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500" :
+                          getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500" :
+                          "bg-red-500/10 text-red-500"
+                        }>
+                          {getCategoryLoad(patientData.triage_category)}
+                        </Badge>
+                        <span className="text-sm">
+                          {hospitalStats?.categoryBreakdown[patientData.triage_category.toString()] || 0} patients in your category
+                        </span>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">Estimated Wait</p>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-primary" />
+                        <span className="text-sm">
+                          ~{formatWaitTime(hospitalStats?.averageWaitTimes[patientData.triage_category.toString()] || 0)}
+                        </span>
+                      </div>
+                    </Card>
+
+                    <Card className="p-4 space-y-2">
+                      <p className="text-sm text-muted-foreground">Total Waiting</p>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-primary" />
+                        <span className="text-sm">
+                          {queueData.waitingCount} patients
+                        </span>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-medium">Wait Times by Category</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                      {Object.entries(hospitalStats.averageWaitTimes).map(([category, time]) => (
+                        <Card 
+                          key={category}
+                          className={`p-3 ${Number(category) === patientData.triage_category ? 'ring-2 ring-primary' : ''}`}
+                        >
+                          <div className="space-y-1">
+                            <Badge variant="outline" className={`w-full justify-center ${
+                              TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.text
+                            } ${
+                              TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.bg.replace('bg-', 'bg-opacity-10')
+                            }`}>
+                              Level {category}
+                            </Badge>
+                            <p className="text-xs text-center text-muted-foreground">
+                              ~{formatWaitTime(time)}
+                            </p>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* ChatBot */}
+          {patientData && (
+            <div className="relative z-50">
+              <ChatBot patientId={patientId} />
+            </div>
+          )}
+        </div>
+      </main>
+    </TooltipProvider>
   );
 }
