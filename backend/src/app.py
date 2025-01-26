@@ -7,7 +7,7 @@ import logging
 #import openai
 from openai import OpenAI
 
-from hospital_data.expected_time import compute_expected_time_seconds
+from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
 from hospital_data.create_db import save_hospital_data
 from hospital_data.hospital_api import get_patient_data, get_all_patient_data
 from hospital_data.queue_data import get_queue_stats
@@ -16,7 +16,7 @@ from tts.elevenlabs import speak_eleven_labs, listen
 from tts.openai import get_chatgpt_response
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app)
 swagger = Swagger(app)
 
 client = OpenAI()
@@ -129,8 +129,31 @@ paths:
         "queuePositionLocal": queue_data[0],
         "queuePositionGlobal": queue_data[1],
         "queueMax": queue_data[2],
-        "allPatients": len(get_all_patient_data())
+        "allPatients": len(get_all_patient_data()),
+        "labs": patient_data.labs,
+        "imaging": patient_data.imaging,
+        "currentPhase": patient_data.status,
+        "patientNumberByCat": get_patient_number_by_cat(),
+        "expectedWaitTimesByCat": get_wait_times_by_cat()
     })
+
+"""
+// Backend API response type
+interface BackendPatientData {
+  arrivalTime: string;
+  elapsedTime: number;
+  triage: string;
+  expectedTime: number;
+  queuePositionLocal: number;
+  queuePositionGlobal: number;
+  queueMax: number;
+  allPatients: number;
+  currentPhase: string;
+  labs: string;
+  imaging: string;
+  error?: string;
+}
+"""
 
 @app.route("/email/<patient_id>", methods=["POST"])
 def send_email(patient_id: str):
