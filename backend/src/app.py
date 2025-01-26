@@ -163,7 +163,7 @@ def send_email(patient_id: str):
     """
     data = request.get_json()
     emails = data.get('emails', [])
-    link = f"http://localhost:3000/patient/anon_{patient_id}"
+    link = f"http://localhost:3000/patient/{patient_id}"
     logger.info(f"Received emails: {emails}, link: {link} for patient_id: {patient_id}")
 
     try:
