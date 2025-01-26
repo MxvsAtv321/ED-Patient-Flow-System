@@ -66,10 +66,24 @@ const ChatBot: React.FC<ChatBotProps> = ({ patientId }) => {
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
           const base64Audio = reader.result as string;
-          // Here you would send the base64Audio to your backend for processing
-          // For now, we'll just show a message
-          setMessage("Speech recording feature coming soon!");
-          await sendMessage();
+          const response = await fetch(`http://localhost:5000/listen/${patientId}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json", 
+            },
+            body: JSON.stringify({
+              base64Audio: base64Audio, 
+            }), 
+          });
+          
+          if (!response.ok) {
+            throw new Error("Speech to Speech failed");
+          }
+          const data = await response.json();
+          const audio = new Audio(`data:audio/webm;base64,${data.base64_tts_audio}`);
+          audio.play();
+          //setMessage("Speech recording feature coming soon!");
+          //await sendMessage();
         };
         stream.getTracks().forEach(track => track.stop());
       };

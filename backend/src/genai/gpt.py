@@ -8,8 +8,8 @@ def get_chatgpt_response(openai_client:any,user_message:str,patient_id:str):
 
     patient_context=""
     if patient_id:
-        formatted_id = f"anon_{patient_id}"
-        patient_info = get_patient_data(formatted_id)
+        #formatted_id = f"anon_{patient_id}"
+        patient_info = get_patient_data(patient_id)
         if patient_info:
             patient_context = f"""
             Current patient information:

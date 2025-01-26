@@ -312,6 +312,7 @@ version = "5.0.0"
 description = "A Flask extension adding a decorator for CORS support"
 optional = false
 python-versions = "*"
+groups = ["main"]
 files = [
     {file = "Flask_Cors-5.0.0-py2.py3-none-any.whl", hash = "sha256:b9e307d082a9261c100d8fb0ba909eec6a228ed1b60a8315fd85f783d61910bc"},
     {file = "flask_cors-5.0.0.tar.gz", hash = "sha256:5aadb4b950c4e93745034594d9f3ea6591f734bb3662e16e255ffbf5e89c88ef"},
@@ -335,6 +336,26 @@ files = [
 [package.dependencies]
 blinker = "*"
 flask = "*"
+
+[[package]]
+name = "groq"
+version = "0.15.0"
+description = "The official Python library for the groq API"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "groq-0.15.0-py3-none-any.whl", hash = "sha256:c200558b67fee4b4f2bb89cc166337e3419a68c23280065770f8f8b0729c79ef"},
+    {file = "groq-0.15.0.tar.gz", hash = "sha256:9ad08ba6156c67d0975595a8515b517f22ff63158e063c55192e161ed3648af1"},
+]
+
+[package.dependencies]
+anyio = ">=3.5.0,<5"
+distro = ">=1.7.0,<2"
+httpx = ">=0.23.0,<1"
+pydantic = ">=1.9.0,<3"
+sniffio = "*"
+typing-extensions = ">=4.10,<5"
 
 [[package]]
 name = "h11"
@@ -1229,4 +1250,4 @@ watchdog = ["watchdog (>=2.3)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "be69ae1401563e9db4c7a6298f13ebb5e64736a8574c7eb02f5b1e41a9aee1a7"
+content-hash = "92a1755177813cbd317acb7d79c75e42df4a8a89d8cbab33ca3bc1e8dbe52c0a"

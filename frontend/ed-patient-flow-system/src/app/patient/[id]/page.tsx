@@ -12,7 +12,8 @@ import { ChatBot } from "@/components/ChatBot";
 import { EmailShare } from "@/components/EmailShare";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-const BACKEND_API_BASE = "https://66b9ae68c8ee.ngrok.app/";
+//const BACKEND_API_BASE = "https://66b9ae68c8ee.ngrok.app/";
+const BACKEND_API_BASE = "http://localhost:5000";
 
 interface BackendPatientData {
   arrivalTime: string;

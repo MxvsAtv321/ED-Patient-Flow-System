@@ -17,6 +17,7 @@ openai = "^1.60.1"
 speechrecognition = "^3.14.1"
 pyaudio = "^0.2.14"
 flask-cors = "^5.0.0"
+groq = "^0.15.0"
 
 [build-system]
 requires = ["poetry-core"]
