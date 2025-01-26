@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { Loader2, AlertCircle, Clock, ClipboardCheck, TestTube, Stethoscope, ArrowRight, HelpCircle, User } from "lucide-react";
 import { ChatBot } from "@/components/ChatBot";
+import { EmailShare } from "@/components/EmailShare";
 
 const IFEM_API_BASE = "https://ifem-award-mchacks-2025.onrender.com/api/v1";
 
@@ -422,6 +423,23 @@ export default function PatientPage() {
   const [queueData, setQueueData] = useState<QueueData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const formatWaitTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h ${mins}m`;
+  };
+
+  const getCategoryLoad = (category: number) => {
+    if (!hospitalStats) return "Unknown";
+    const count = hospitalStats.categoryBreakdown[category] || 0;
+    const total = Object.values(hospitalStats.categoryBreakdown).reduce((a, b) => a + b, 0);
+    const percentage = (count / total) * 100;
+    
+    if (percentage < 33) return "Low";
+    if (percentage < 66) return "Moderate";
+    return "High";
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -872,76 +890,216 @@ export default function PatientPage() {
           </motion.div>
         </div>
 
-        {/* Wait Time Stats */}
-        {patientData && (
-          <WaitTimeStats 
-            hospitalStats={hospitalStats}
-            queueData={queueData}
-            patientCategory={patientData.triage_category}
-            patientData={patientData}
-          />
+        {/* Stats Panels */}
+        {patientData && hospitalStats && queueData && (
+          <div className="w-full max-w-3xl mx-auto mt-8 space-y-4">
+            {/* Your Position Panel */}
+            <Card className="relative overflow-hidden">
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+                animate={{
+                  opacity: [0.5, 0.8, 0.5],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              
+              <div className="relative p-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Your Position</h3>
+                    <p className="text-sm text-muted-foreground mt-1">#{patientData.queue_position.global} Overall</p>
+                  </div>
+                  <EmailShare patientId={patientId} />
+                </div>
+
+                <div className="space-y-6">
+                  {(() => {
+                    const getEstimatedCompletion = () => {
+                      const waitTime = hospitalStats.averageWaitTimes[patientData.triage_category] || 0;
+                      const elapsedTime = patientData.time_elapsed;
+                      const remainingTime = Math.max(0, waitTime - elapsedTime);
+                      
+                      const now = new Date();
+                      const completionTime = new Date(now.getTime() + remainingTime * 60000);
+                      
+                      return {
+                        remaining: formatWaitTime(remainingTime),
+                        time: completionTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        progress: Math.min(100, (elapsedTime / waitTime) * 100)
+                      };
+                    };
+
+                    const estimatedCompletion = getEstimatedCompletion();
+
+                    return (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Queue Progress</span>
+                            <span className="font-medium">{Math.round(estimatedCompletion.progress)}%</span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <motion.div
+                              className="h-full bg-primary"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${estimatedCompletion.progress}%` }}
+                              transition={{ duration: 1 }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <Card className="p-4 space-y-2">
+                            <p className="text-sm text-muted-foreground">Category Position</p>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className={`${
+                                TRIAGE_COLORS[patientData.triage_category as keyof typeof TRIAGE_COLORS]?.text
+                              } ${
+                                TRIAGE_COLORS[patientData.triage_category as keyof typeof TRIAGE_COLORS]?.bg.replace('bg-', 'bg-opacity-10')
+                              }`}>
+                                #{patientData.queue_position.category}
+                              </Badge>
+                              <span className="text-sm">
+                                of {hospitalStats.categoryBreakdown[patientData.triage_category]} in Level {patientData.triage_category}
+                              </span>
+                            </div>
+                          </Card>
+
+                          <Card className="p-4 space-y-2">
+                            <p className="text-sm text-muted-foreground">Estimated Completion</p>
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-primary" />
+                              <span className="text-sm">
+                                ~{estimatedCompletion.time}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {estimatedCompletion.remaining} remaining
+                            </p>
+                          </Card>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div>
+                            <p className="text-sm font-medium">{formatWaitTime(patientData.time_elapsed)}</p>
+                            <p className="text-xs text-muted-foreground">Time Elapsed</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{estimatedCompletion.remaining}</p>
+                            <p className="text-xs text-muted-foreground">Estimated Remaining</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{formatWaitTime(hospitalStats.averageWaitTimes[patientData.triage_category])}</p>
+                            <p className="text-xs text-muted-foreground">Average Total</p>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </Card>
+
+            {/* Current ED Status Panel */}
+            <Card className="relative overflow-hidden">
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5"
+                animate={{
+                  opacity: [0.5, 0.8, 0.5],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              />
+              
+              <div className="relative p-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Current ED Status</h3>
+                  <Badge variant="outline" className="bg-primary/10 text-primary">
+                    Live Updates
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">Current Load</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={
+                        getCategoryLoad(patientData.triage_category) === "Low" ? "bg-green-500/10 text-green-500" :
+                        getCategoryLoad(patientData.triage_category) === "Moderate" ? "bg-orange-500/10 text-orange-500" :
+                        "bg-red-500/10 text-red-500"
+                      }>
+                        {getCategoryLoad(patientData.triage_category)}
+                      </Badge>
+                      <span className="text-sm">
+                        {hospitalStats.categoryBreakdown[patientData.triage_category]} patients in your category
+                      </span>
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">Estimated Wait</p>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-primary" />
+                      <span className="text-sm">
+                        ~{formatWaitTime(hospitalStats.averageWaitTimes[patientData.triage_category])}
+                      </span>
+                    </div>
+                  </Card>
+
+                  <Card className="p-4 space-y-2">
+                    <p className="text-sm text-muted-foreground">Total Waiting</p>
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-primary" />
+                      <span className="text-sm">
+                        {queueData.waitingCount} patients
+                      </span>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-sm font-medium">Wait Times by Category</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                    {Object.entries(hospitalStats.averageWaitTimes).map(([category, time]) => (
+                      <Card 
+                        key={category}
+                        className={`p-3 ${Number(category) === patientData.triage_category ? 'ring-2 ring-primary' : ''}`}
+                      >
+                        <div className="space-y-1">
+                          <Badge variant="outline" className={`w-full justify-center ${
+                            TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.text
+                          } ${
+                            TRIAGE_COLORS[Number(category) as keyof typeof TRIAGE_COLORS]?.bg.replace('bg-', 'bg-opacity-10')
+                          }`}>
+                            Level {category}
+                          </Badge>
+                          <p className="text-xs text-center text-muted-foreground">
+                            ~{formatWaitTime(time)}
+                          </p>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
         )}
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1 }}
-          className="mt-8 text-center"
-        >
-          <motion.div 
-            className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-card border border-border/40 shadow-lg relative overflow-hidden"
-            whileHover={{ scale: 1.02 }}
-          >
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/5 to-primary/0"
-              animate={{
-                x: ['-200%', '200%'],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-            />
-            <div className="flex items-center gap-2 relative">
-              <motion.div 
-                className="w-2 h-2 rounded-full bg-primary"
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.5, 1, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              <span className="text-sm text-muted-foreground">Current Status:</span>
-            </div>
-            <Badge className="capitalize bg-primary/10 text-primary border-primary/20 relative">
-              <span className="relative z-10">{currentPhase.replace(/_/g, ' ')}</span>
-              <motion.div
-                className="absolute inset-0 bg-primary/5 rounded-md"
-                animate={{
-                  opacity: [0.5, 1, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-            </Badge>
-          </motion.div>
-        </motion.div>
+        {/* ChatBot */}
+        {patientData && (
+          <div className="relative z-50">
+            <ChatBot patientId={patientData.id} />
+          </div>
+        )}
       </div>
-
-      {/* Add ChatBot with proper z-index */}
-      {patientData && (
-        <div className="relative z-50">
-          <ChatBot patientId={patientData.id} />
-        </div>
-      )}
     </main>
   );
-} 
+}
