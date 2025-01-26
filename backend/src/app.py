@@ -5,6 +5,8 @@ from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
 from openai import OpenAI
+import groq
+import base64
 
 from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
 from hospital_data.create_db import save_hospital_data
@@ -19,6 +21,7 @@ CORS(app)
 swagger = Swagger(app)
 app.config.from_pyfile('config.py')
 openai_client = OpenAI()
+groq_client = groq.Client()
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -195,22 +198,43 @@ def chat():
             return jsonify({'error': 'Message is required'}), 400
       
         bot_reply = get_chatgpt_response(openai_client,user_message,patient_id)
-        return jsonify({'response': bot_reply})
+        return jsonify({'reply': bot_reply})
 
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@app.route('/listen', methods=['GET'])
-def listen_to_speech():
-    patient_id = request.json.get('patient_id')
-    text = listen()
-    if text:
-        chatgpt_response = get_chatgpt_response(openai_client,text,patient_id)
-        speak_eleven_labs(chatgpt_response)
-        return jsonify({'response': chatgpt_response})
-    else:
-        return jsonify({'error': 'Could not understand the speech'}), 400
+@app.route('/listen/<patient_id>', methods=['POST'])
+def listen_to_speech(patient_id:str):
+    data = request.json
+    try:
+      base64_audio = data.get('base64Audio')
+      audio_data = base64.b64decode(base64_audio.split(',')[1]) #this is bad right now
+      with open("temp_audio.webm", "wb") as temp_file:
+        temp_file.write(audio_data)
+      audio_file = open("temp_audio.webm","rb")
+      transcription = openai_client.audio.transcriptions.create(
+          model="whisper-1", 
+          file=audio_file
+      )
+      audio_text = transcription.text
+      gpt_response = get_chatgpt_response(openai_client,audio_text,patient_id)
+      response = openai_client.audio.speech.create(
+        model="tts-1",  
+        voice="alloy",  # can choose from: alloy, echo, fable, onyx, nova, or shimmer
+        input=gpt_response,
+      )
+      tts_audio = response.content
+      base64_tts_audio = base64.b64encode(tts_audio).decode('utf-8')
+      return jsonify({
+          "base64_tts_audio": base64_tts_audio,
+      }),200
+    except Exception as e:
+      print(f"Error for Speech to Speech: {e}")
+      return jsonify({'error': 'Internal server error'}), 500
+
+
+
 
 
 if __name__ == "__main__":
