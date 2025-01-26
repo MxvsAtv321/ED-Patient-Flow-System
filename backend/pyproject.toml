@@ -13,6 +13,9 @@ python-dotenv = "^1.0.1"
 flask-mail = "^0.10.0"
 
 requests = "^2.32.3"
+openai = "^1.60.1"
+speechrecognition = "^3.14.1"
+pyaudio = "^0.2.14"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,19 +1,23 @@
 from flask import Flask, jsonify, request
 from flask_mail import Mail, Message
 from flasgger import Swagger
-from config import BACKEND_PORT, MAIL_PASSWORD, MAIL_PORT, MAIL_SERVER, MAIL_USE_SSL, MAIL_USE_TLS
+from config import BACKEND_PORT
 import logging
-import os
-from dotenv import load_dotenv
+#import openai
+from openai import OpenAI
 
 from hospital_data.expected_time import compute_expected_time_seconds
 from hospital_data.create_db import save_hospital_data
 from hospital_data.hospital_api import get_patient_data, get_all_patient_data
 from hospital_data.queue_data import get_queue_stats
 
-load_dotenv()
+from tts.elevenlabs import speak_eleven_labs, listen
+from tts.openai import get_chatgpt_response
+
 app = Flask(__name__)
 swagger = Swagger(app)
+
+client = OpenAI()
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -26,13 +30,7 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-app.config["MAIL_USERNAME"] = os.getenv('MAIL_USERNAME')
-app.config["MAIL_PASSWORD"] = os.getenv('MAIL_PASSWORD')
 
-app.config["MAIL_SERVER"] = MAIL_SERVER
-app.config["MAIL_PORT"] = MAIL_PORT
-app.config["MAIL_USE_TLS"] = MAIL_USE_TLS
-app.config["MAIL_USE_SSL"] = MAIL_USE_SSL
 mail = Mail(app)
 
 @app.route("/")
@@ -180,6 +178,60 @@ def send_email(patient_id: str):
     except Exception as e:
         logger.error(f"Failed to send email: {e} for patient_id: {patient_id}")
         return jsonify({"error": "Failed to send email"}), 500
+
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        user_message = request.json.get('message')
+        patient_id = request.json.get('patient_id')
+
+        if not user_message:
+            return jsonify({'error': 'Message is required'}), 400
+
+        system_message = """You are a helpful chatbot designed to assist patients in the emergency room. 
+        Explain medical terms clearly, provide reassurance, and answer questions about the ED process."""
+
+        if patient_id:
+            patient_info = get_patient_data(patient_id)
+            if patient_info:
+                patient_context = f"""
+                Current patient information:
+                - Triage Category: {patient_info.triage_category}
+                - Current Phase: {patient_info.status}
+                - Time Elapsed: {patient_info.wait_time} minutes
+                - Queue Position: {patient_info.queue_global}
+                - Investigation Status: Labs: {patient_info.labs}, 
+                  Imaging: {patient_info.imaging}
+                """
+                system_message += "\n" + patient_context
+
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[ 
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=150
+        )
+
+        #bot_reply = response['choices'][0]['message']['content']
+        bot_reply=response.choices[0].message
+        return jsonify({'response': bot_reply})
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/listen', methods=['GET'])
+def listen_to_speech():
+    text = listen()
+    if text:
+        chatgpt_response = get_chatgpt_response(text)
+        speak_eleven_labs(chatgpt_response)
+        return jsonify({'response': chatgpt_response})
+    else:
+        return jsonify({'error': 'Could not understand the speech'}), 400
+
 
 if __name__ == "__main__":
     save_hospital_data()
