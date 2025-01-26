@@ -11,6 +11,7 @@ from hospital_data.create_db import save_hospital_data
 from hospital_data.hospital_api import get_patient_data, get_all_patient_data
 from hospital_data.queue_data import get_queue_stats
 
+load_dotenv()
 app = Flask(__name__)
 swagger = Swagger(app)
 
