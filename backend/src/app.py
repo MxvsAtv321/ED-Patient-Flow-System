@@ -5,6 +5,7 @@ from flasgger import Swagger
 from config import BACKEND_PORT
 import logging
 from openai import OpenAI
+#from dotenv import load_dotenv
 
 from hospital_data.expected_time import compute_expected_time_seconds, get_wait_times_by_cat, get_patient_number_by_cat
 from hospital_data.create_db import save_hospital_data
@@ -12,13 +13,13 @@ from hospital_data.hospital_api import get_patient_data, get_all_patient_data
 from hospital_data.queue_data import get_queue_stats
 
 from tts.elevenlabs import speak_eleven_labs, listen
-from tts.openai import get_chatgpt_response
+from gpt import get_chatgpt_response
 
 app = Flask(__name__)
 CORS(app)
 swagger = Swagger(app)
-
-client = OpenAI()
+app.config.from_pyfile('config.py')
+openai_client = OpenAI()
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -193,35 +194,8 @@ def chat():
 
         if not user_message:
             return jsonify({'error': 'Message is required'}), 400
-
-        system_message = """You are a helpful chatbot designed to assist patients in the emergency room. 
-        Explain medical terms clearly, provide reassurance, and answer questions about the ED process."""
-
-        if patient_id:
-            patient_info = get_patient_data(patient_id)
-            if patient_info:
-                patient_context = f"""
-                Current patient information:
-                - Triage Category: {patient_info.triage_category}
-                - Current Phase: {patient_info.status}
-                - Time Elapsed: {patient_info.wait_time} minutes
-                - Queue Position: {patient_info.queue_global}
-                - Investigation Status: Labs: {patient_info.labs}, 
-                  Imaging: {patient_info.imaging}
-                """
-                system_message += "\n" + patient_context
-
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[ 
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=150
-        )
-
-        #bot_reply = response['choices'][0]['message']['content']
-        bot_reply=response.choices[0].message
+      
+        bot_reply = get_chatgpt_response(openai_client,user_message,patient_id)
         return jsonify({'response': bot_reply})
 
     except Exception as e:
@@ -230,9 +204,10 @@ def chat():
 
 @app.route('/listen', methods=['GET'])
 def listen_to_speech():
+    patient_id = request.json.get('patient_id')
     text = listen()
     if text:
-        chatgpt_response = get_chatgpt_response(text)
+        chatgpt_response = get_chatgpt_response(openai_client,text,patient_id)
         speak_eleven_labs(chatgpt_response)
         return jsonify({'response': chatgpt_response})
     else:
